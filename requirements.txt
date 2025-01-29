@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+google-api-python-client
+youtube-transcript-api
+openai
+supabase-py 
