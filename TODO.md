@@ -3,8 +3,7 @@
 ## OAuth Features
 - [ ] Like videos automatically
 - [ ] Mark videos as watched
-- [ ] Subscribe to channels
-- [ ] Add videos to playlists
+- [ ] Add/remove videos to/from playlists (pull a video off a playlist and add it to a private "Processed" playlist)
 
 ## Enhanced Metadata
 - [ ] Video tags/categories
@@ -19,13 +18,13 @@
 - [ ] Key timestamps with descriptions
 - [ ] Sentiment analysis of comments
 - [ ] Language detection and translation options
+- [ ] Evaluate Meissler's Fabric project's "Extract Wisdom" prompt for additional useful improvements
 
 ## User Experience
-- [ ] Support for individual video URLs (not just playlists)
+- [ ] Support for individual video URLs and "latest n videos" from channels (not just playlists)
 - [ ] Batch processing of multiple videos
 - [ ] Custom summary prompts
-- [ ] Save favorite playlists
-- [ ] Email notifications for new videos
+- [ ] Scheduled tasks to Send summaries via email or other methods
 
 ## Technical Improvements
 - [ ] Rate limiting and caching
