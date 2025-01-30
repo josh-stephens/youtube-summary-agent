@@ -82,7 +82,7 @@ def get_latest_video(playlist_id):
             maxResults=1
         )
         response = request.execute()
-        logger.info(f"Playlist API response: {response}")
+        logger.info(f"Playlist API response snippet: {response['items'][0]['snippet']}")
         
         if "items" not in response or not response["items"]:
             logger.error("No items found in playlist response")
@@ -92,20 +92,25 @@ def get_latest_video(playlist_id):
         video_id = video["resourceId"]["videoId"]
         logger.info(f"Found video ID: {video_id}")
         
-        # Get additional video statistics
+        # Get additional video statistics and details
         logger.info("Fetching video statistics")
         video_request = youtube.videos().list(
             part="statistics,snippet",
             id=video_id
         )
         video_response = video_request.execute()
-        logger.info(f"Video stats response: {video_response}")
+        logger.info(f"Video details snippet: {video_response['items'][0]['snippet']}")
         
         if not video_response["items"]:
             logger.error("No video details found")
             return None
             
-        video_stats = video_response["items"][0]
+        video_item = video_response["items"][0]  # Get the whole video item
+        video_details = video_item["snippet"]    # Get snippet for title, description etc
+        video_stats = video_item["statistics"]   # Get statistics separately
+        
+        # Use the channel info from the video details
+        channel_name = video_details["channelTitle"]
         
         # Get top comments
         try:
@@ -132,13 +137,13 @@ def get_latest_video(playlist_id):
         
         return {
             "video_id": video_id,
-            "title": video["title"],
-            "description": video["description"],
-            "published_at": video["publishedAt"],
-            "channel_name": video["channelTitle"],
-            "view_count": video_stats["statistics"].get("viewCount", "N/A"),
-            "like_count": video_stats["statistics"].get("likeCount", "N/A"),
-            "comment_count": video_stats["statistics"].get("commentCount", "N/A"),
+            "title": video_details["title"],
+            "description": video_details["description"],
+            "published_at": video_details["publishedAt"],
+            "channel_name": channel_name,
+            "view_count": video_stats.get("viewCount", "N/A"),
+            "like_count": video_stats.get("likeCount", "N/A"),
+            "comment_count": video_stats.get("commentCount", "N/A"),
             "top_comments": top_comments
         }
     except Exception as e:
@@ -153,13 +158,29 @@ def get_video_transcript(video_id):
     except:
         return None  # No transcript available
 
-def summarize_text(text):
-    """Summarizes the transcript using OpenAI GPT."""
+def summarize_text(text, video_data):
+    """Summarizes the transcript using OpenAI GPT, with video metadata for context."""
+    system_prompt = """You are an AI that summarizes YouTube videos. 
+    Provide a clear, informative summary that captures the key points and maintains accuracy, 
+    especially regarding technical terms, proper nouns, and people mentioned. 
+    The channel name often indicates the primary content creator or presenter - use this context 
+    to accurately attribute statements and actions in the video."""
+
+    context = f"""Video Title: {video_data['title']}
+Channel: {video_data['channel_name']} (This is likely the presenter/creator's channel)
+Description: {video_data['description']}
+View Count: {video_data['view_count']}
+
+Using this context, please provide an accurate summary of the following transcript, 
+being especially careful to correctly attribute who is speaking or presenting:
+
+"""
+
     response = openai.ChatCompletion.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "Summarize this video transcript in a concise and informative manner."},
-            {"role": "user", "content": text}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": context + text}
         ]
     )
     return response["choices"][0]["message"]["content"]
@@ -182,7 +203,7 @@ def process_playlist(playlist_id):
         }
 
     transcript = get_video_transcript(video_data["video_id"])
-    summary = summarize_text(transcript) if transcript else "Transcript unavailable."
+    summary = summarize_text(transcript, video_data) if transcript else "Transcript unavailable."
 
     return {
         "title": video_data["title"],
