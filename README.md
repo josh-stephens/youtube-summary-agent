@@ -1,13 +1,23 @@
 # YouTube Summary Agent
 
-A Live Agent Studio agent that fetches and summarizes the latest video from a YouTube playlist. The agent provides rich metadata including view counts, upload dates, and top comments.
+A Live Agent Studio agent that fetches and summarizes YouTube videos. The agent provides rich metadata including view counts, upload dates, top comments, and generates AI-powered summaries using GPT-4.
 
 ## Features
 
-- Fetches latest video from a YouTube playlist
+- Supports multiple YouTube URL formats:
+  - Full video URLs
+  - Short video URLs (youtu.be)
+  - Direct video IDs
+  - Playlist URLs (grabs the most recent video from the playlist)
+  - Direct playlist IDs (grabs the most recent video from the playlist)
 - Generates AI-powered summary of video content
-- Provides video metadata (title, channel, views, etc.)
-- Shows top comments
+- Provides comprehensive video metadata:
+  - Title and channel information
+  - View counts and engagement metrics
+  - Upload date and duration
+  - Tags and topics
+  - Availability of captions
+- Shows top comments with engagement metrics
 - Stores conversation history in Supabase
 
 ## Setup
@@ -37,15 +47,14 @@ A Live Agent Studio agent that fetches and summarizes the latest video from a Yo
 
 ## Usage
 
-Send a POST request to `/api/youtube-summary-agent` with:
-
-The query can be any of these formats:
+Send a POST request to `/api/youtube-summary-agent` with any of these formats:
 - YouTube video URL: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
 - YouTube playlist URL: `https://www.youtube.com/playlist?list=PLlaN88a7y2_plecYoJxvRFTLHVbIVAOoc`
 - Short video URL: `https://youtu.be/dQw4w9WgXcQ`
 - Direct video ID: `dQw4w9WgXcQ`
 - Direct playlist ID: `PLlaN88a7y2_plecYoJxvRFTLHVbIVAOoc`
 
+Request format:
 ```json
 {
     "query": "YOUR_VIDEO_OR_PLAYLIST_URL",
@@ -60,6 +69,19 @@ Headers:
 Authorization: Bearer your_token_here
 Content-Type: application/json
 ```
+
+## Testing
+
+Use the included PowerShell test script to verify functionality:
+```powershell
+.\test.ps1
+```
+
+The test script will:
+1. Load configuration from your .env file
+2. Test all supported URL formats
+3. Display formatted results with color coding
+4. Show any errors or issues
 
 ## Development
 
