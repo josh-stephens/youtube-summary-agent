@@ -21,7 +21,7 @@
 - [ ] Evaluate Meissler's Fabric project's "Extract Wisdom" prompt for additional useful improvements
 
 ## User Experience
-- [ ] Support for individual video URLs and "latest n videos" from channels (not just playlists)
+- [x] Support for individual video URLs and playlist URLs with flexible input formats
 - [ ] Batch processing of multiple videos
 - [ ] Custom summary prompts
 - [ ] Scheduled tasks to Send summaries via email or other methods

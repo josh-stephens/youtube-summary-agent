@@ -111,7 +111,7 @@ def get_latest_video(playlist_id):
         video_content = video_item["contentDetails"]
         
         # Use the channel info from the video details
-        channel_name = video_details["channelTitle"]
+        channel_name = video["videoOwnerChannelTitle"]
         
         # Get top comments
         try:
@@ -295,6 +295,34 @@ def format_response(result):
     
     return response
 
+def extract_youtube_id(query: str) -> tuple[str, str]:
+    """
+    Extract video or playlist ID from various YouTube URL formats.
+    Returns tuple of (id_type, id) where id_type is 'video' or 'playlist'
+    """
+    query = query.strip()
+    
+    # Handle different URL patterns
+    if "youtube.com" in query or "youtu.be" in query:
+        if "playlist?list=" in query:
+            # Playlist URL
+            playlist_id = query.split("playlist?list=")[-1].split("&")[0]
+            return ("playlist", playlist_id)
+        elif "watch?v=" in query:
+            # Video URL
+            video_id = query.split("watch?v=")[-1].split("&")[0]
+            return ("video", video_id)
+        elif "youtu.be/" in query:
+            # Short video URL
+            video_id = query.split("youtu.be/")[-1].split("?")[0]
+            return ("video", video_id)
+    else:
+        # Assume it's a direct ID - check length to guess type
+        if len(query) == 11:  # Standard YouTube video ID length
+            return ("video", query)
+        else:
+            return ("playlist", query)
+
 @app.post("/api/youtube-summary-agent", response_model=AgentResponse)
 async def process_request(
     request: AgentRequest,
@@ -311,17 +339,14 @@ async def process_request(
             logger.error(f"Failed to store user message: {str(e)}")
             raise
 
-        # Extract YouTube playlist ID from query
-        playlist_id = request.query.strip()
-        logger.info(f"Processing playlist ID: {playlist_id}")
+        # Extract ID and type from query
+        id_type, content_id = extract_youtube_id(request.query)
+        logger.info(f"Processing {id_type} with ID: {content_id}")
         
-        # Process the playlist
-        try:
-            result = process_playlist(playlist_id)
-            logger.info("Successfully processed playlist")
-        except Exception as e:
-            logger.error(f"Failed to process playlist: {str(e)}")
-            raise
+        if id_type == "video":
+            result = process_video(content_id)
+        else:  # playlist
+            result = process_playlist(content_id)
         
         # Store agent's response with additional data
         response_data = {
@@ -357,6 +382,85 @@ async def process_request(
             success=False,
             error=error_message
         )
+
+def process_video(video_id: str):
+    """Process a single video by ID."""
+    try:
+        # Get video details
+        video_request = youtube.videos().list(
+            part="statistics,snippet,contentDetails,topicDetails,status",
+            id=video_id
+        )
+        video_response = video_request.execute()
+        
+        if not video_response["items"]:
+            logger.error("No video found with ID: {video_id}")
+            return None
+            
+        video_item = video_response["items"][0]
+        video_details = video_item["snippet"]
+        video_stats = video_item["statistics"]
+        video_content = video_item["contentDetails"]
+        
+        # Get top comments
+        try:
+            logger.info("Fetching video comments")
+            comments_request = youtube.commentThreads().list(
+                part="snippet",
+                videoId=video_id,
+                order="relevance",
+                maxResults=5
+            )
+            comments_response = comments_request.execute()
+            top_comments = [
+                {
+                    "author": item["snippet"]["topLevelComment"]["snippet"]["authorDisplayName"],
+                    "text": item["snippet"]["topLevelComment"]["snippet"]["textDisplay"],
+                    "likes": item["snippet"]["topLevelComment"]["snippet"]["likeCount"]
+                }
+                for item in comments_response.get("items", [])
+            ]
+            logger.info(f"Found {len(top_comments)} comments")
+        except Exception as e:
+            logger.error(f"Error fetching comments: {str(e)}")
+            top_comments = []
+        
+        # Build video data dictionary
+        video_data = {
+            "video_id": video_id,
+            "title": video_details["title"],
+            "description": video_details["description"],
+            "published_at": video_details["publishedAt"],
+            "channel_name": video_details["channelTitle"],
+            "view_count": video_stats.get("viewCount", "N/A"),
+            "like_count": video_stats.get("likeCount", "N/A"),
+            "comment_count": video_stats.get("commentCount", "N/A"),
+            "top_comments": top_comments,
+            "duration": video_content["duration"],
+            "tags": video_details.get("tags", []),
+            "category_id": video_details.get("categoryId", "N/A"),
+            "language": video_details.get("defaultLanguage", "N/A"),
+            "made_for_kids": video_item["status"]["madeForKids"],
+            "privacy_status": video_item["status"]["privacyStatus"],
+            "definition": video_content["definition"],
+            "caption": video_content["caption"],
+            "licensed_content": video_content.get("licensedContent", False),
+            "projection": video_content["projection"],
+            "topics": video_item.get("topicDetails", {}).get("topicCategories", [])
+        }
+        
+        # Get and process transcript
+        transcript = get_video_transcript(video_id)
+        summary = summarize_text(transcript, video_data) if transcript else "Transcript unavailable."
+        
+        return {
+            **video_data,
+            "summary": summary
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing video: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     import uvicorn

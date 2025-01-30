@@ -39,9 +39,16 @@ A Live Agent Studio agent that fetches and summarizes the latest video from a Yo
 
 Send a POST request to `/api/youtube-summary-agent` with:
 
+The query can be any of these formats:
+- YouTube video URL: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+- YouTube playlist URL: `https://www.youtube.com/playlist?list=PLlaN88a7y2_plecYoJxvRFTLHVbIVAOoc`
+- Short video URL: `https://youtu.be/dQw4w9WgXcQ`
+- Direct video ID: `dQw4w9WgXcQ`
+- Direct playlist ID: `PLlaN88a7y2_plecYoJxvRFTLHVbIVAOoc`
+
 ```json
 {
-    "query": "YOUR_PLAYLIST_ID",
+    "query": "YOUR_VIDEO_OR_PLAYLIST_URL",
     "user_id": "test-user",
     "request_id": "test-request",
     "session_id": "test-session"
