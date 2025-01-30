@@ -95,7 +95,7 @@ def get_latest_video(playlist_id):
         # Get additional video statistics and details
         logger.info("Fetching video statistics")
         video_request = youtube.videos().list(
-            part="statistics,snippet",
+            part="statistics,snippet,contentDetails,topicDetails,status",
             id=video_id
         )
         video_response = video_request.execute()
@@ -108,6 +108,7 @@ def get_latest_video(playlist_id):
         video_item = video_response["items"][0]  # Get the whole video item
         video_details = video_item["snippet"]    # Get snippet for title, description etc
         video_stats = video_item["statistics"]   # Get statistics separately
+        video_content = video_item["contentDetails"]
         
         # Use the channel info from the video details
         channel_name = video_details["channelTitle"]
@@ -144,7 +145,18 @@ def get_latest_video(playlist_id):
             "view_count": video_stats.get("viewCount", "N/A"),
             "like_count": video_stats.get("likeCount", "N/A"),
             "comment_count": video_stats.get("commentCount", "N/A"),
-            "top_comments": top_comments
+            "top_comments": top_comments,
+            "duration": video_content["duration"],  # Video length in ISO 8601 format
+            "tags": video_details.get("tags", []),  # Keywords/tags
+            "category_id": video_details.get("categoryId", "N/A"),  # YouTube category
+            "language": video_details.get("defaultLanguage", "N/A"),
+            "made_for_kids": video_item["status"]["madeForKids"],
+            "privacy_status": video_item["status"]["privacyStatus"],
+            "definition": video_content["definition"],  # HD or SD
+            "caption": video_content["caption"],  # Has captions?
+            "licensed_content": video_content.get("licensedContent", False),
+            "projection": video_content["projection"],  # 360° video?
+            "topics": video_item.get("topicDetails", {}).get("topicCategories", [])
         }
     except Exception as e:
         logger.error(f"Error in get_latest_video: {str(e)}")
@@ -169,11 +181,15 @@ def summarize_text(text, video_data):
     context = f"""Video Title: {video_data['title']}
 Channel: {video_data['channel_name']} (This is likely the presenter/creator's channel)
 Description: {video_data['description']}
+Duration: {video_data['duration']}
 View Count: {video_data['view_count']}
+Tags: {', '.join(video_data['tags'][:5]) if video_data['tags'] else 'None'}
+Topics: {', '.join(video_data['topics']) if video_data['topics'] else 'None'}
+Language: {video_data['language']}
+Has Captions: {'Yes' if video_data['caption'] == 'true' else 'No'}
 
 Using this context, please provide an accurate summary of the following transcript, 
 being especially careful to correctly attribute who is speaking or presenting:
-
 """
 
     response = openai.ChatCompletion.create(
@@ -205,15 +221,9 @@ def process_playlist(playlist_id):
     transcript = get_video_transcript(video_data["video_id"])
     summary = summarize_text(transcript, video_data) if transcript else "Transcript unavailable."
 
+    # Return all metadata fields
     return {
-        "title": video_data["title"],
-        "description": video_data["description"],
-        "published_at": video_data["published_at"],
-        "channel_name": video_data["channel_name"],
-        "view_count": video_data["view_count"],
-        "like_count": video_data["like_count"],
-        "comment_count": video_data["comment_count"],
-        "top_comments": video_data["top_comments"],
+        **video_data,  # Include all video metadata
         "summary": summary
     }
 
@@ -229,12 +239,48 @@ def format_response(result):
     except:
         view_count = result["view_count"]
     
+    # Format duration from ISO 8601 to readable format
+    duration = result.get("duration", "N/A")
+    if duration.startswith("PT"):
+        # Remove the "PT" prefix
+        duration = duration[2:]
+        # Convert XhYmZs format to readable string
+        hours = "0"
+        minutes = "0"
+        seconds = "0"
+        
+        if "H" in duration:
+            hours, duration = duration.split("H")
+        if "M" in duration:
+            minutes, duration = duration.split("M")
+        if "S" in duration:
+            seconds = duration.replace("S", "")
+            
+        if hours != "0":
+            duration = f"{hours}:{minutes.zfill(2)}:{seconds.zfill(2)}"
+        else:
+            duration = f"{minutes}:{seconds.zfill(2)}"
+    
+    # Format tags and topics
+    tags = ", ".join(result.get("tags", [])[:5]) if result.get("tags") else "None"
+    # Clean up topic URLs to just show the topic name
+    topics = []
+    for topic in result.get("topics", []):
+        if "wikipedia.org/wiki/" in topic:
+            topic_name = topic.split("/wiki/")[-1].replace("_", " ")
+            topics.append(topic_name)
+    topics = ", ".join(topics) if topics else "None"
+    
     response = f"""Here's a summary of the latest video:
 
 📺 Title: {result['title']}
 👤 Channel: {result['channel_name']}
 📅 Upload Date: {formatted_date}
+⏱️ Duration: {duration}
 👀 Views: {view_count}
+🏷️ Tags: {tags}
+📚 Topics: {topics}
+🗣️ Captions: {'Available' if result.get('caption') == 'true' else 'Not Available'}
 
 📝 Summary:
 {result['summary']}
