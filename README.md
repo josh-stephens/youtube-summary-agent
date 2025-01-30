@@ -11,6 +11,7 @@ A Live Agent Studio agent that fetches and summarizes YouTube videos. The agent 
   - Playlist URLs (grabs the most recent video from the playlist)
   - Direct playlist IDs (grabs the most recent video from the playlist)
 - Generates AI-powered summary of video content
+  - Grounds the summary on the video's metadata and transcript
 - Provides comprehensive video metadata:
   - Title and channel information
   - View counts and engagement metrics
